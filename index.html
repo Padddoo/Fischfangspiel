@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>🐱 Katze fängt Fisch 🐟</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: "Comic Sans MS", "Trebuchet MS", sans-serif;
+      background: linear-gradient(to bottom, #87ceeb 0%, #b9e4ff 60%, #a8e063 100%);
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #spielfeld {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      background: transparent;
+    }
+
+    #punkte {
+      position: fixed;
+      top: 14px;
+      left: 18px;
+      font-size: 32px;
+      font-weight: bold;
+      color: #1f3a93;
+      text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    #gameover {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 3;
+    }
+
+    #gameover.aktiv { display: flex; }
+
+    .karte {
+      background: #fff;
+      border-radius: 24px;
+      padding: 32px 40px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      max-width: 90vw;
+    }
+
+    .karte h1 {
+      font-size: 36px;
+      color: #e74c3c;
+      margin-bottom: 12px;
+    }
+
+    .karte p {
+      font-size: 24px;
+      color: #2c3e50;
+      margin-bottom: 24px;
+    }
+
+    .karte button {
+      font-family: inherit;
+      font-size: 24px;
+      padding: 14px 28px;
+      border: none;
+      border-radius: 16px;
+      background: #27ae60;
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #1e8449;
+    }
+
+    .karte button:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 #1e8449;
+    }
+  </style>
+</head>
+<body>
+  <div id="punkte">Punkte: 0</div>
+  <canvas id="spielfeld"></canvas>
+
+  <div id="gameover">
+    <div class="karte">
+      <h1>Spiel vorbei!</h1>
+      <p>Deine Punkte: <span id="endpunkte">0</span></p>
+      <button id="nochmal">Nochmal spielen</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("spielfeld");
+    const ctx = canvas.getContext("2d");
+    const punkteAnzeige = document.getElementById("punkte");
+    const gameoverBox = document.getElementById("gameover");
+    const endpunkteAnzeige = document.getElementById("endpunkte");
+    const nochmalButton = document.getElementById("nochmal");
+
+    let breite = 0;
+    let hoehe = 0;
+
+    function groesseAnpassen() {
+      breite = window.innerWidth;
+      hoehe = window.innerHeight;
+      canvas.width = breite;
+      canvas.height = hoehe;
+      if (katze) {
+        katze.y = hoehe - 90;
+        if (katze.x > breite - katze.groesse) katze.x = breite - katze.groesse;
+      }
+    }
+
+    const katze = {
+      x: 0,
+      y: 0,
+      groesse: 70,
+      tempo: 8,
+      linksGedrueckt: false,
+      rechtsGedrueckt: false,
+      zielX: null
+    };
+
+    const fischEmojis = ["🐟", "🐠", "🐡"];
+    let fische = [];
+    let punkte = 0;
+    let spielLaeuft = true;
+    let spawnTimer = 0;
+    let spawnIntervall = 90;
+    let basisFallTempo = 2.5;
+
+    function neuerFisch() {
+      const groesse = 45;
+      fische.push({
+        x: Math.random() * (breite - groesse),
+        y: -groesse,
+        groesse: groesse,
+        tempo: basisFallTempo + Math.random() * 1.2 + punkte * 0.05,
+        emoji: fischEmojis[Math.floor(Math.random() * fischEmojis.length)]
+      });
+    }
+
+    function spielZuruecksetzen() {
+      fische = [];
+      punkte = 0;
+      spawnTimer = 0;
+      spawnIntervall = 90;
+      katze.x = breite / 2 - katze.groesse / 2;
+      katze.y = hoehe - 90;
+      katze.zielX = null;
+      punkteAnzeige.textContent = "Punkte: 0";
+      gameoverBox.classList.remove("aktiv");
+      spielLaeuft = true;
+    }
+
+    function gameOver() {
+      spielLaeuft = false;
+      endpunkteAnzeige.textContent = punkte;
+      gameoverBox.classList.add("aktiv");
+    }
+
+    function update() {
+      if (!spielLaeuft) return;
+
+      if (katze.linksGedrueckt) katze.x -= katze.tempo;
+      if (katze.rechtsGedrueckt) katze.x += katze.tempo;
+
+      if (katze.zielX !== null) {
+        const diff = katze.zielX - (katze.x + katze.groesse / 2);
+        if (Math.abs(diff) > 2) {
+          katze.x += Math.sign(diff) * Math.min(Math.abs(diff), katze.tempo * 1.6);
+        }
+      }
+
+      if (katze.x < 0) katze.x = 0;
+      if (katze.x > breite - katze.groesse) katze.x = breite - katze.groesse;
+
+      spawnTimer++;
+      if (spawnTimer >= spawnIntervall) {
+        neuerFisch();
+        spawnTimer = 0;
+        spawnIntervall = Math.max(30, 90 - punkte * 1.5);
+      }
+
+      for (let i = fische.length - 1; i >= 0; i--) {
+        const fisch = fische[i];
+        fisch.y += fisch.tempo;
+
+        const katzeMitteX = katze.x + katze.groesse / 2;
+        const katzeMitteY = katze.y + katze.groesse / 2;
+        const fischMitteX = fisch.x + fisch.groesse / 2;
+        const fischMitteY = fisch.y + fisch.groesse / 2;
+        const dx = katzeMitteX - fischMitteX;
+        const dy = katzeMitteY - fischMitteY;
+        const abstand = Math.sqrt(dx * dx + dy * dy);
+        const treffer = (katze.groesse + fisch.groesse) / 2.4;
+
+        if (abstand < treffer) {
+          fische.splice(i, 1);
+          punkte++;
+          punkteAnzeige.textContent = "Punkte: " + punkte;
+          continue;
+        }
+
+        if (fisch.y > hoehe) {
+          gameOver();
+          return;
+        }
+      }
+    }
+
+    function zeichne() {
+      ctx.clearRect(0, 0, breite, hoehe);
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+      ctx.beginPath();
+      ctx.arc(breite * 0.15, hoehe * 0.18, 30, 0, Math.PI * 2);
+      ctx.arc(breite * 0.2, hoehe * 0.18, 36, 0, Math.PI * 2);
+      ctx.arc(breite * 0.25, hoehe * 0.18, 28, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(breite * 0.7, hoehe * 0.1, 24, 0, Math.PI * 2);
+      ctx.arc(breite * 0.75, hoehe * 0.1, 30, 0, Math.PI * 2);
+      ctx.arc(breite * 0.8, hoehe * 0.1, 22, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#7ec850";
+      ctx.fillRect(0, hoehe - 40, breite, 40);
+
+      ctx.font = "45px serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      for (const fisch of fische) {
+        ctx.fillText(fisch.emoji, fisch.x, fisch.y);
+      }
+
+      ctx.font = "70px serif";
+      ctx.fillText("🐱", katze.x, katze.y);
+    }
+
+    function schleife() {
+      update();
+      zeichne();
+      requestAnimationFrame(schleife);
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") { katze.linksGedrueckt = true; katze.zielX = null; }
+      if (e.key === "ArrowRight") { katze.rechtsGedrueckt = true; katze.zielX = null; }
+    });
+
+    window.addEventListener("keyup", (e) => {
+      if (e.key === "ArrowLeft") katze.linksGedrueckt = false;
+      if (e.key === "ArrowRight") katze.rechtsGedrueckt = false;
+    });
+
+    function setzeZiel(clientX) {
+      katze.zielX = clientX;
+    }
+
+    canvas.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      setzeZiel(e.touches[0].clientX);
+    }, { passive: false });
+
+    canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      setzeZiel(e.touches[0].clientX);
+    }, { passive: false });
+
+    canvas.addEventListener("mousedown", (e) => setzeZiel(e.clientX));
+    canvas.addEventListener("mousemove", (e) => {
+      if (e.buttons === 1) setzeZiel(e.clientX);
+    });
+
+    nochmalButton.addEventListener("click", spielZuruecksetzen);
+    nochmalButton.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      spielZuruecksetzen();
+    }, { passive: false });
+
+    window.addEventListener("resize", groesseAnpassen);
+
+    groesseAnpassen();
+    katze.x = breite / 2 - katze.groesse / 2;
+    katze.y = hoehe - 90;
+    schleife();
+  </script>
+</body>
+</html>
