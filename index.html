@@ -37,6 +37,32 @@
       pointer-events: none;
     }
 
+    #leben {
+      position: fixed;
+      top: 14px;
+      right: 18px;
+      font-size: 32px;
+      font-weight: bold;
+      z-index: 2;
+      pointer-events: none;
+      text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff;
+    }
+
+    #teamHinweis {
+      position: fixed;
+      top: 60px;
+      left: 18px;
+      font-size: 22px;
+      font-weight: bold;
+      color: #c0392b;
+      text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff;
+      z-index: 2;
+      pointer-events: none;
+      display: none;
+    }
+
+    #teamHinweis.aktiv { display: block; }
+
     #gameover {
       position: fixed;
       inset: 0;
@@ -90,6 +116,8 @@
 </head>
 <body>
   <div id="punkte">Punkte: 0</div>
+  <div id="leben">❤️❤️❤️</div>
+  <div id="teamHinweis">🐈 Team-Katze hilft! (3 Fische)</div>
   <canvas id="spielfeld"></canvas>
 
   <div id="gameover">
@@ -104,9 +132,14 @@
     const canvas = document.getElementById("spielfeld");
     const ctx = canvas.getContext("2d");
     const punkteAnzeige = document.getElementById("punkte");
+    const lebenAnzeige = document.getElementById("leben");
+    const teamHinweis = document.getElementById("teamHinweis");
     const gameoverBox = document.getElementById("gameover");
     const endpunkteAnzeige = document.getElementById("endpunkte");
     const nochmalButton = document.getElementById("nochmal");
+
+    const MAX_LEBEN = 3;
+    const TEAM_FANG_LIMIT = 3;
 
     let breite = 0;
     let hoehe = 0;
@@ -119,6 +152,10 @@
       if (katze) {
         katze.y = hoehe - 90;
         if (katze.x > breite - katze.groesse) katze.x = breite - katze.groesse;
+      }
+      if (teamKatze) {
+        teamKatze.y = hoehe - 90;
+        if (teamKatze.x > breite - teamKatze.groesse) teamKatze.x = breite - teamKatze.groesse;
       }
     }
 
@@ -135,10 +172,40 @@
     const fischEmojis = ["🐟", "🐠", "🐡"];
     let fische = [];
     let punkte = 0;
+    let leben = MAX_LEBEN;
     let spielLaeuft = true;
     let spawnTimer = 0;
     let spawnIntervall = 120;
     let basisFallTempo = 1.5;
+    let teamKatze = null;
+
+    function aktualisiereLeben() {
+      lebenAnzeige.textContent = "❤️".repeat(leben) + "🖤".repeat(MAX_LEBEN - leben);
+    }
+
+    function spawneTeamKatze() {
+      if (!spielLaeuft) return;
+      if (teamKatze !== null) return;
+      const startLinks = (katze.x + katze.groesse / 2) > breite / 2;
+      teamKatze = {
+        x: startLinks ? 10 : breite - 70,
+        y: hoehe - 90,
+        groesse: 60,
+        tempo: 11,
+        gefangen: 0
+      };
+      zeigeTeamHinweis();
+    }
+
+    function zeigeTeamHinweis() {
+      if (teamKatze) {
+        const uebrig = TEAM_FANG_LIMIT - teamKatze.gefangen;
+        teamHinweis.textContent = "🐈 Team-Katze hilft! (" + uebrig + " " + (uebrig === 1 ? "Fisch" : "Fische") + ")";
+        teamHinweis.classList.add("aktiv");
+      } else {
+        teamHinweis.classList.remove("aktiv");
+      }
+    }
 
     function neuerFisch() {
       const groesse = 45;
@@ -154,12 +221,16 @@
     function spielZuruecksetzen() {
       fische = [];
       punkte = 0;
+      leben = MAX_LEBEN;
       spawnTimer = 0;
       spawnIntervall = 120;
       katze.x = breite / 2 - katze.groesse / 2;
       katze.y = hoehe - 90;
       katze.zielX = null;
+      teamKatze = null;
       punkteAnzeige.textContent = "Punkte: 0";
+      aktualisiereLeben();
+      zeigeTeamHinweis();
       gameoverBox.classList.remove("aktiv");
       spielLaeuft = true;
     }
@@ -193,14 +264,53 @@
         spawnIntervall = Math.max(55, 120 - punkte * 0.8);
       }
 
+      if (teamKatze) {
+        let ziel = null;
+        let zielY = -Infinity;
+        for (const f of fische) {
+          if (f.y > zielY) { zielY = f.y; ziel = f; }
+        }
+        if (ziel) {
+          const zielMitteX = ziel.x + ziel.groesse / 2;
+          const teamMitteX = teamKatze.x + teamKatze.groesse / 2;
+          const diff = zielMitteX - teamMitteX;
+          if (Math.abs(diff) > 2) {
+            teamKatze.x += Math.sign(diff) * Math.min(Math.abs(diff), teamKatze.tempo);
+          }
+        }
+        if (teamKatze.x < 0) teamKatze.x = 0;
+        if (teamKatze.x > breite - teamKatze.groesse) teamKatze.x = breite - teamKatze.groesse;
+      }
+
       for (let i = fische.length - 1; i >= 0; i--) {
         const fisch = fische[i];
         fisch.y += fisch.tempo;
 
-        const katzeMitteX = katze.x + katze.groesse / 2;
-        const katzeMitteY = katze.y + katze.groesse / 2;
         const fischMitteX = fisch.x + fisch.groesse / 2;
         const fischMitteY = fisch.y + fisch.groesse / 2;
+
+        if (teamKatze) {
+          const tmx = teamKatze.x + teamKatze.groesse / 2;
+          const tmy = teamKatze.y + teamKatze.groesse / 2;
+          const tdx = tmx - fischMitteX;
+          const tdy = tmy - fischMitteY;
+          const tAbstand = Math.sqrt(tdx * tdx + tdy * tdy);
+          const tTreffer = (teamKatze.groesse + fisch.groesse) / 1.9;
+          if (tAbstand < tTreffer) {
+            fische.splice(i, 1);
+            punkte++;
+            teamKatze.gefangen++;
+            punkteAnzeige.textContent = "Punkte: " + punkte;
+            if (teamKatze.gefangen >= TEAM_FANG_LIMIT) {
+              teamKatze = null;
+            }
+            zeigeTeamHinweis();
+            continue;
+          }
+        }
+
+        const katzeMitteX = katze.x + katze.groesse / 2;
+        const katzeMitteY = katze.y + katze.groesse / 2;
         const dx = katzeMitteX - fischMitteX;
         const dy = katzeMitteY - fischMitteY;
         const abstand = Math.sqrt(dx * dx + dy * dy);
@@ -214,8 +324,13 @@
         }
 
         if (fisch.y > hoehe) {
-          gameOver();
-          return;
+          fische.splice(i, 1);
+          leben--;
+          aktualisiereLeben();
+          if (leben <= 0) {
+            gameOver();
+            return;
+          }
         }
       }
     }
@@ -248,6 +363,11 @@
 
       ctx.font = "70px serif";
       ctx.fillText("🐱", katze.x, katze.y);
+
+      if (teamKatze) {
+        ctx.font = "60px serif";
+        ctx.fillText("🐈", teamKatze.x, teamKatze.y);
+      }
     }
 
     function schleife() {
@@ -259,6 +379,7 @@
     window.addEventListener("keydown", (e) => {
       if (e.key === "ArrowLeft") { katze.linksGedrueckt = true; katze.zielX = null; }
       if (e.key === "ArrowRight") { katze.rechtsGedrueckt = true; katze.zielX = null; }
+      if (e.key === "t" || e.key === "T") spawneTeamKatze();
     });
 
     window.addEventListener("keyup", (e) => {
@@ -296,6 +417,7 @@
     groesseAnpassen();
     katze.x = breite / 2 - katze.groesse / 2;
     katze.y = hoehe - 90;
+    aktualisiereLeben();
     schleife();
   </script>
 </body>
