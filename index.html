@@ -126,7 +126,7 @@
       x: 0,
       y: 0,
       groesse: 70,
-      tempo: 8,
+      tempo: 13,
       linksGedrueckt: false,
       rechtsGedrueckt: false,
       zielX: null
@@ -137,8 +137,8 @@
     let punkte = 0;
     let spielLaeuft = true;
     let spawnTimer = 0;
-    let spawnIntervall = 90;
-    let basisFallTempo = 2.5;
+    let spawnIntervall = 120;
+    let basisFallTempo = 1.5;
 
     function neuerFisch() {
       const groesse = 45;
@@ -146,7 +146,7 @@
         x: Math.random() * (breite - groesse),
         y: -groesse,
         groesse: groesse,
-        tempo: basisFallTempo + Math.random() * 1.2 + punkte * 0.05,
+        tempo: basisFallTempo + Math.random() * 0.8 + punkte * 0.03,
         emoji: fischEmojis[Math.floor(Math.random() * fischEmojis.length)]
       });
     }
@@ -155,7 +155,7 @@
       fische = [];
       punkte = 0;
       spawnTimer = 0;
-      spawnIntervall = 90;
+      spawnIntervall = 120;
       katze.x = breite / 2 - katze.groesse / 2;
       katze.y = hoehe - 90;
       katze.zielX = null;
@@ -179,7 +179,7 @@
       if (katze.zielX !== null) {
         const diff = katze.zielX - (katze.x + katze.groesse / 2);
         if (Math.abs(diff) > 2) {
-          katze.x += Math.sign(diff) * Math.min(Math.abs(diff), katze.tempo * 1.6);
+          katze.x += Math.sign(diff) * Math.min(Math.abs(diff), katze.tempo * 2.5);
         }
       }
 
@@ -190,7 +190,7 @@
       if (spawnTimer >= spawnIntervall) {
         neuerFisch();
         spawnTimer = 0;
-        spawnIntervall = Math.max(30, 90 - punkte * 1.5);
+        spawnIntervall = Math.max(55, 120 - punkte * 0.8);
       }
 
       for (let i = fische.length - 1; i >= 0; i--) {
@@ -204,7 +204,7 @@
         const dx = katzeMitteX - fischMitteX;
         const dy = katzeMitteY - fischMitteY;
         const abstand = Math.sqrt(dx * dx + dy * dy);
-        const treffer = (katze.groesse + fisch.groesse) / 2.4;
+        const treffer = (katze.groesse + fisch.groesse) / 1.9;
 
         if (abstand < treffer) {
           fische.splice(i, 1);
